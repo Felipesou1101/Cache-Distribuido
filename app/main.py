@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import rondom
 from fastapi import FastAPI
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -12,9 +13,19 @@ app = FastAPI()
 HOSTNAME = os.getenv("HOSTNAME", "Instância Desconhecida")
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 DB_REPLICA_HOST = os.getenv("DB_REPLICA_HOST", "postgres-leitura-1,postgres-leitura-2").split(",")
+DB_PRIMARY_HOST = os.getenv("DB_PRIMARY_HOST","postgres-escrita")
 
 # Conexão com o Redis (Cache Distribuído)
 cache = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
+
+def get_primary_db_connection():
+	return psycopg2.connect(
+	    host= DB_PRIMARY_HOST,
+            database= os.getenv("POSTGRES_DB"),
+            user= os.getenv("POSTGRES_USER"),
+            password= os.getenv("POSTGRES_PASSWORD"),
+            cursor_factory=RealDictCursor
+	)
 
 def get_random_replica_host():
     """Retorna um host de réplica aleatório da lista de hosts de réplica."""
@@ -83,7 +94,7 @@ def buscar_produto(produto_id: int):
 @app.put("/produtos/{produto_id}")
 def atualizar_preco(produto_id: int, novo_preco: float):
     # 1. Atualiza no Banco de ESCRITA (Master/Primary)
-    conn = get_db_connection()
+    conn = get_primary_db_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE produtos SET preco = %s WHERE id = %s", (novo_preco, produto_id))
     conn.commit()
