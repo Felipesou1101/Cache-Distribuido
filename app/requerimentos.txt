@@ -1,0 +1,4 @@
+fastapi
+uvicron
+psycopg2-binary
+redis

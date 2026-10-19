@@ -1,0 +1,71 @@
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8090:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app1
+      - app2
+  
+  app1:
+    build: ./app
+    environment:
+      - HOSTNAME=App-Container-1
+      - REDIS_HOST=redis
+      - DB_PRIMARY_HOST=postgres-escrita
+      - DB_REPLICA_HOST=postgres-leitura-1
+    depends_on:
+      - redis
+      - postgres-escrita
+      - postgres-leitura-1
+      - postgres-leitura-2
+  
+  app2:
+    build: ./app
+    environment:
+      - HOSTNAME=App-Container-2
+      - REDIS_HOST=redis
+      - DB_PRIMARY_HOST=postgres-escrita
+      - DB_REPLICA_HOST=postgres-leitura-2
+    depends_on:
+      - redis
+      - postgres-escrita
+      - postgres-leitura-1
+      - postgres-leitura-2
+  
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  # Banco de Dados de ESCRITA (Primary)
+  postgres-escrita:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # Banco de Dados de LEITURA (Réplica)
+  postgres-leitura-1:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+  
+    # Banco de Dados de LEITURA (Réplica)
+  postgres-leitura-2:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
