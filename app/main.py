@@ -11,18 +11,22 @@ app = FastAPI()
 # Variáveis de ambiente configuradas no Docker Compose
 HOSTNAME = os.getenv("HOSTNAME", "Instância Desconhecida")
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+DB_REPLICA_HOST = os.getenv("DB_REPLICA_HOST", "postgres-leitura-1,postgres-leitura-2").split(",")
 DB_PRIMARY_HOST = os.getenv("DB_PRIMARY_HOST", "postgres-primary")
-DB_REPLICA_HOST = os.getenv("DB_REPLICA_HOST") # Como fazer a variavel DB_REPLICA_HOST ficar com o valor que está no docker-compose.yml, que é postgres-leitura-2? 
 
 # Conexão com o Redis (Cache Distribuído)
 cache = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
 
+def get_random_replica_host():
+    """Retorna um host de réplica aleatório da lista de hosts de réplica."""
+    return random.choice(DB_REPLICA_HOST)
+
 def get_db_connection(host):
     return psycopg2.connect(
-        host=host,
-        database="lojadb",
-        user="postgres",
-        password="password",
+        host= get_random_replica_host(),
+        database= os.getenv("POSTGRES_DB"),
+        user= os.getenv("POSTGRES_USER"),
+        password= os.getenv("POSTGRES_PASSWORD"),
         cursor_factory=RealDictCursor
     )
 

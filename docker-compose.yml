@@ -15,10 +15,7 @@ services:
       - HOSTNAME=App-Container-1
       - REDIS_HOST=redis
       - DB_PRIMARY_HOST=postgres-escrita
-      - DB_REPLICA_HOST=postgres-leitura-1
-    depends_on:
-      - redis
-      - postgres-escrita
+      - DB_REPLICA_HOST=postgres-leitura-1,postgres-leitura-2 # O valor de forma aleatoria
       - postgres-leitura-1
       - postgres-leitura-2
   
@@ -28,7 +25,7 @@ services:
       - HOSTNAME=App-Container-2
       - REDIS_HOST=redis
       - DB_PRIMARY_HOST=postgres-escrita
-      - DB_REPLICA_HOST=postgres-leitura-2
+      - DB_REPLICA_HOST=postgres-leitura-1,postgres-leitura-2
     depends_on:
       - redis
       - postgres-escrita
