@@ -4,7 +4,7 @@ Create table categorias (
 )
 
 Create table produtos (
-    int id_produto primary key auto_increment,
+    int id_produto primary key,
     varchar nome_produto varchar(100) not null,
     decimal preco decimal(10,2) not null,
     int id_categoria int not null,
@@ -42,10 +42,10 @@ Create table fornecedores (
 
 Insert into categorias (nome_categoria) values ('Eletrônicos'), ('Roupas'), ('Alimentos');
 
-Insert into produtos (nome_produto, preco, id_categoria) values 
-('Smartphone', 1500.00, 1), 
-('Notebook', 3000.00, 1), 
-('Camiseta', 50.00, 2), 
-('Calça Jeans', 100.00, 2), 
-('Arroz', 20.00, 3), 
-('Feijão', 15.00, 3);
+Insert into produtos (id_produto, nome_produto, preco, id_categoria) values 
+(1, 'Smartphone', 1500.00, 1), 
+(2, 'Notebook', 3000.00, 1), 
+(3, 'Camiseta', 50.00, 2), 
+(4, 'Calça Jeans', 100.00, 2), 
+(5, 'Arroz', 20.00, 3), 
+(6, 'Feijão', 15.00, 3);
