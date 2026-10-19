@@ -12,7 +12,6 @@ app = FastAPI()
 HOSTNAME = os.getenv("HOSTNAME", "Instância Desconhecida")
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 DB_REPLICA_HOST = os.getenv("DB_REPLICA_HOST", "postgres-leitura-1,postgres-leitura-2").split(",")
-DB_PRIMARY_HOST = os.getenv("DB_PRIMARY_HOST", "postgres-primary")
 
 # Conexão com o Redis (Cache Distribuído)
 cache = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
@@ -21,7 +20,7 @@ def get_random_replica_host():
     """Retorna um host de réplica aleatório da lista de hosts de réplica."""
     return random.choice(DB_REPLICA_HOST)
 
-def get_db_connection(host):
+def get_db_connection():
     return psycopg2.connect(
         host= get_random_replica_host(),
         database= os.getenv("POSTGRES_DB"),
@@ -52,7 +51,7 @@ def buscar_produto(produto_id: int):
 
     # 2. Cache Miss: Lê do Banco de Dados de LEITURA (Réplica)
     time.sleep(1.5) # Simula uma consulta demorada/complexa com JOIN
-    conn = get_db_connection(DB_REPLICA_HOST)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT p.id, p.nome, p.preco, c.nome AS categoria
@@ -84,7 +83,7 @@ def buscar_produto(produto_id: int):
 @app.put("/produtos/{produto_id}")
 def atualizar_preco(produto_id: int, novo_preco: float):
     # 1. Atualiza no Banco de ESCRITA (Master/Primary)
-    conn = get_db_connection(DB_PRIMARY_HOST)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE produtos SET preco = %s WHERE id = %s", (novo_preco, produto_id))
     conn.commit()
