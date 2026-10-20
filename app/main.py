@@ -119,7 +119,7 @@ def startup_logical_replication():
     db_primary_host = DB_PRIMARY_HOST
 
     for replica_host in DB_REPLICA_HOST:
-        hostname = replica_host.strip()
+        subscription_name = f"sub_{replica_host.replace('-', '_')}"
         conectado = False
         tentativas = 0
         max_tentativas = 5
@@ -131,12 +131,12 @@ def startup_logical_replication():
                     database=db_name,
                     user=db_user,
                     password=db_password
+                    connect_timeout=3
                 )
 
                 conn.autocommit = True
                 cursor = conn.cursor()
 
-                subscription_name = f"replica_subscription_{replica_host.replace('.', '_')}"
                 cursor.execute("Select 1 from pg_subscription where subname = %s", (subscription_name,))
 
                 if not cursor.fetchone():
