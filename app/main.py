@@ -21,10 +21,10 @@ cache = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
 def get_primary_db_connection():
 	return psycopg2.connect(
 	    host= DB_PRIMARY_HOST,
-            database= os.getenv("POSTGRES_DB"),
-            user= os.getenv("POSTGRES_USER"),
-            password= os.getenv("POSTGRES_PASSWORD"),
-            cursor_factory=RealDictCursor
+        database= os.getenv("POSTGRES_DB"),
+        user= os.getenv("POSTGRES_USER"),
+        password= os.getenv("POSTGRES_PASSWORD"),
+        cursor_factory=RealDictCursor
 	)
 
 def get_random_replica_host():
@@ -110,3 +110,40 @@ def atualizar_preco(produto_id: int, novo_preco: float):
         "cache_invalidado": chave_cache,
         "processado_por": HOSTNAME
     }
+
+@app.on_event("startup")
+def startup_logical_replication():
+    db_name = os.getenv("POSTGRES_DB")
+    db_user = os.getenv("POSTGRES_USER")
+    db_password = os.getenv("POSTGRES_PASSWORD")
+    db_primary_host = DB_PRIMARY_HOST
+
+    for replica_host in DB_REPLICA_HOST:
+        try:
+            conn = psycopg2.connect(
+                host=replica_host,
+                database=db_name,
+                user=db_user,
+                password=db_password
+            )
+
+            conn.autocommit = True
+            cursor = conn.cursor()
+
+            subscription_name = f"replica_subscription_{replica_host.replace('.', '_')}"
+            cursor.execute("Select 1 from pg_subscription where subname = %s", (subscription_name,))
+
+            if not cursor.fetchone():
+                cursor.execute(f"""
+                    CREATE SUBSCRIPTION {subscription_name}
+                    CONNECTION 'host={db_primary_host} dbname={db_name} user={db_user} password={db_password}'
+                    PUBLICATION pub_produtos;
+                """)
+                print(f"Subscription {subscription_name} criada com sucesso na replica {replica_host}")
+            else:
+                print(f"Subscription {subscription_name} já existe na replica {replica_host}")
+            
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Erro ao configurar a réplica {replica_host}: {e}")
