@@ -1,7 +1,7 @@
 import os
 import time
 import json
-import rondom
+import random
 from fastapi import FastAPI
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -66,8 +66,8 @@ def buscar_produto(produto_id: int):
     cursor = conn.cursor()
     cursor.execute("""
         SELECT p.id, p.nome, p.preco, c.nome AS categoria
-        FROM produtos p
-        JOIN categorias c ON p.categoria_id = c.id
+        FROM produto p
+        JOIN categoria c ON p.id_categoria = c.id
         WHERE p.id = %s
     """, (produto_id,))
     produto = cursor.fetchone()
@@ -96,7 +96,7 @@ def atualizar_preco(produto_id: int, novo_preco: float):
     # 1. Atualiza no Banco de ESCRITA (Master/Primary)
     conn = get_primary_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE produtos SET preco = %s WHERE id = %s", (novo_preco, produto_id))
+    cursor.execute("UPDATE produto SET preco = %s WHERE id = %s", (novo_preco, produto_id))
     conn.commit()
     cursor.close()
     conn.close()
