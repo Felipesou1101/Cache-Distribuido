@@ -9,13 +9,13 @@ import redis
 
 app = FastAPI()
 
+# Variáveis de ambiente configuradas no Docker Compose
 HOSTNAME = os.getenv("HOSTNAME", "Instância Desconhecida")
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-DB_REPLICA_HOST = [
-    host.strip() for host in os.getenv("DB_REPLICA_HOST", "postgres-leitura-1,postgres-leitura-2").split(",")
-]
+DB_REPLICA_HOST = os.getenv("DB_REPLICA_HOST", "postgres-leitura-1,postgres-leitura-2").split(",")
 DB_PRIMARY_HOST = os.getenv("DB_PRIMARY_HOST","postgres-escrita")
 
+# Conexão com o Redis (Cache Distribuído)
 cache = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
 
 def get_primary_db_connection():
@@ -91,8 +91,10 @@ def buscar_produto(produto_id: int):
     if not produto:
         return {"erro": "Produto não encontrado"}
 
+    # Converte preço NUMERIC para float para serializar JSON
     produto['preco'] = float(produto['preco'])
 
+    # 3. Salva no Redis com TTL de 30 segundos
     cache.setex(chave_cache, 30, json.dumps(produto))
 
     tempo_ms = round((time.time() - inicio) * 1000, 2)
@@ -102,7 +104,6 @@ def buscar_produto(produto_id: int):
         "atendido_por": HOSTNAME,
         "dados": produto
     }
-
 
 @app.put("/produtos/{produto_id}")
 def atualizar_preco(produto_id: int, novo_preco: float):
@@ -134,97 +135,6 @@ def atualizar_preco(produto_id: int, novo_preco: float):
         "cache_invalidado": chave_cache,
         "processado_por": HOSTNAME
     }
-
-@app.post("/produtos")
-def criar_produto(nome: str, preco: float, id_categoria: int):
-    """
-    Cria um novo produto no banco de dados primário (Master/Primary).
-
-    Args:
-        nome (str): Nome do produto.
-        preco (float): Preço do produto.
-        id_categoria (int): ID da categoria do produto.
-
-    Returns:
-        dict: Dicionário contendo a mensagem de sucesso e o ID do produto criado.
-    """
-    conn = get_primary_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO produto (nome, preco, id_categoria)
-        VALUES (%s, %s, %s)
-        RETURNING id
-    """, (nome, preco, id_categoria))
-    produto_id = cursor.fetchone()['id']
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    return {
-        "mensagem": "Produto criado com sucesso.",
-        "id": produto_id
-    }
-
-@app.post("/categorias")
-def criar_categoria(nome: str):
-    """
-    Cria uma nova categoria no banco de dados primário (Master/Primary)
-
-    Args:
-        nome (str): Nome da categoria a ser criada.
-
-    Returns:
-        dict: Dicionário contendo a mensagem de sucesso e o ID da categoria criada.
-    """
-    conn = get_primary_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO categoria (nome)
-        VALUES (%s)
-        RETURNING id
-    """, (nome,))
-    categoria_id = cursor.fetchone()['id']
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    return {
-        "mensagem": "Categoria criada com sucesso.",
-        "id": categoria_id
-    }
-
-@app.delete("/produtos/{produto_id}")
-def deletar_produto(produto_id: int):
-    """
-    Deleta um produto do banco de dados primário (Master/Primary) e invalida o cache correspondente no Redis.
-
-    Args:
-        produto_id (int): ID do produto a ser deletado.
-    
-    Returns:
-        dict: Dicionário contendo a mensagem de sucesso, chave de cache invalidada e hostname
-              do container que processou a requisição.
-    """
-    conn = get_primary_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM produto WHERE id = %s", (produto_id,))
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    # Invalidação de Cache Explícita
-    chave_cache = f"produto:{produto_id}"
-    try:
-        cache.delete(chave_cache)
-    except Exception as e:
-        print(f"Erro ao apagar chave do Redis: {e}")
-
-    return {
-        "mensagem": f"Produto {produto_id} deletado do BD Primary.",
-        "cache_invalidado": chave_cache,
-        "processado_por": HOSTNAME
-    }
-
 
 @app.on_event("startup")
 def startup_logical_replication():
