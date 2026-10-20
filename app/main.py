@@ -137,7 +137,7 @@ def startup_logical_replication():
             # Cria a publicação no banco de dados primário
             cursor_primary.execute("SELECT 1 FROM pg_publication WHERE pubname = 'pub_produtos'")
             if not cursor_primary.fetchone():
-                cursor_primary.execute("CREATE PUBLICATION pub_produtos FOR TABLE produto;")
+                cursor_primary.execute("CREATE PUBLICATION pub_produtos FOR ALL TABLES;")
                 print("Publicação 'pub_produtos' criada com sucesso no banco primário.")
             else:
                 print("Publicação 'pub_produtos' já existe no banco primário.")
