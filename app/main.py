@@ -117,7 +117,32 @@ def startup_logical_replication():
     db_user = os.getenv("POSTGRES_USER")
     db_password = os.getenv("POSTGRES_PASSWORD")
     db_primary_host = DB_PRIMARY_HOST
+    
+    # Configura a publicação no banco de dados primário
+    try:
+        conn_primary = psycopg2.connect(
+            host=db_primary_host,
+            database=db_name,
+            user=db_user,
+            password=db_password
+        )
+        conn_primary.autocommit = True
+        cursor_primary = conn_primary.cursor()
 
+        # Cria a publicação no banco de dados primário
+        cursor_primary.execute("SELECT 1 FROM pg_publication WHERE pubname = 'pub_produtos'")
+        if not cursor_primary.fetchone():
+            cursor_primary.execute("CREATE PUBLICATION pub_produtos FOR TABLE produto;")
+            print("Publicação 'pub_produtos' criada com sucesso no banco primário.")
+        else:
+            print("Publicação 'pub_produtos' já existe no banco primário.")
+
+        cursor_primary.close()
+        conn_primary.close()
+    except Exception as e:
+        print(f"Erro ao configurar a publicação no banco primário: {e}")
+
+    # Configura a assinatura em cada réplica
     for replica_host in DB_REPLICA_HOST:
         subscription_name = f"sub_{replica_host.replace('-', '_')}"
         conectado = False

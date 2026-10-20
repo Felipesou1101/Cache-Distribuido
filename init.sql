@@ -26,15 +26,3 @@ INSERT INTO produto (id, nome, preco, id_categoria) VALUES
 
 SELECT setval('categoria_id_seq', (SELECT MAX(id) FROM categoria));
 SELECT setval('produto_id_seq', (SELECT MAX(id) FROM produto));
-
--- Configuração da Replicação Lógica da tabela produto
-DO $$
-BEGIN
-    IF current_database() = '${POSTGRES_DB}' AND inet_server_addr() IS NOT NULL THEN
-        
-        CREATE PUBLICATION pub_produtos FOR TABLE produto;
-    END IF;
-EXCEPTION WHEN OTHERS THEN
-    NULL;
-END
-$$;
