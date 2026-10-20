@@ -2,6 +2,7 @@ import os
 import time
 import json
 import random
+import threading
 from fastapi import FastAPI
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -9,7 +10,6 @@ import redis
 
 app = FastAPI()
 
-# Variáveis de ambiente configuradas no Docker Compose
 HOSTNAME = os.getenv("HOSTNAME", "Instância Desconhecida")
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 DB_REPLICA_HOST = [
@@ -21,9 +21,7 @@ DB_NAME = os.getenv("POSTGRES_DB")
 DB_USER = os.getenv("POSTGRES_USER")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 
-# Conexão com o Redis (Cache Distribuído)
 cache = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
-
 
 def get_primary_db_connection():
     """Retorna uma conexão com o banco de dados primário (Master/Primary)."""
@@ -53,6 +51,14 @@ def get_db_connection():
         connect_timeout=3
     )
 
+def apagar_cache_atrasado(chave_cache, atraso_segundos: float = 3.0):
+    """Apaga a chave do cache após um atraso especificado."""
+    time.sleep(atraso_segundos)
+    try:
+        cache.delete(chave_cache)
+        print(f"Chave {chave_cache} apagada do Redis após {atraso_segundos} segundos.")
+    except Exception as e:
+        print(f"Erro ao apagar chave do Redis: {e}")
 
 @app.get("/")
 def home():
@@ -103,7 +109,6 @@ def buscar_produto(produto_id: int):
     if not produto:
         return {"erro": "Produto não encontrado"}
 
-    # Converte preço NUMERIC para float para serializar JSON
     produto['preco'] = float(produto['preco'])
 
     # 3. Salva no Redis com TTL de 30 segundos
@@ -140,6 +145,8 @@ def atualizar_preco(produto_id: int, novo_preco: float):
         cache.delete(chave_cache)
     except Exception as e:
         print(f"Erro ao invalidar Redis: {e}")
+
+    threading.Thread(target=apagar_cache_atrasado, args=(chave_cache, 3.0)).start()
 
     return {
         "mensagem": f"Preço do produto {produto_id} atualizado no BD Primary.",
@@ -208,6 +215,8 @@ def deletar_produto(produto_id: int):
         cache.delete(chave_cache)
     except Exception as e:
         print(f"Erro ao apagar chave do Redis: {e}")
+    
+    threading.Thread(target=apagar_cache_atrasado, args=(chave_cache, 2.0)).start()
 
     return {
         "mensagem": f"Produto {produto_id} deletado do BD Primary.",
