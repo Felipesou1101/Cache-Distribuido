@@ -155,7 +155,7 @@ def startup_logical_replication():
                     host=replica_host,
                     database=db_name,
                     user=db_user,
-                    password=db_password
+                    password=db_password,
                     connect_timeout=3
                 )
 
