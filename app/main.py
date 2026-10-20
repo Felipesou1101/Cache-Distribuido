@@ -119,31 +119,40 @@ def startup_logical_replication():
     db_primary_host = DB_PRIMARY_HOST
 
     for replica_host in DB_REPLICA_HOST:
-        try:
-            conn = psycopg2.connect(
-                host=replica_host,
-                database=db_name,
-                user=db_user,
-                password=db_password
-            )
+        hostname = replica_host.strip()
+        conectado = False
+        tentativas = 0
+        max_tentativas = 5
+        
+        while not conectado and tentativas < max_tentativas:
+            try:
+                conn = psycopg2.connect(
+                    host=replica_host,
+                    database=db_name,
+                    user=db_user,
+                    password=db_password
+                )
 
-            conn.autocommit = True
-            cursor = conn.cursor()
+                conn.autocommit = True
+                cursor = conn.cursor()
 
-            subscription_name = f"replica_subscription_{replica_host.replace('.', '_')}"
-            cursor.execute("Select 1 from pg_subscription where subname = %s", (subscription_name,))
+                subscription_name = f"replica_subscription_{replica_host.replace('.', '_')}"
+                cursor.execute("Select 1 from pg_subscription where subname = %s", (subscription_name,))
 
-            if not cursor.fetchone():
-                cursor.execute(f"""
-                    CREATE SUBSCRIPTION {subscription_name}
-                    CONNECTION 'host={db_primary_host} dbname={db_name} user={db_user} password={db_password}'
-                    PUBLICATION pub_produtos;
-                """)
-                print(f"Subscription {subscription_name} criada com sucesso na replica {replica_host}")
-            else:
-                print(f"Subscription {subscription_name} já existe na replica {replica_host}")
+                if not cursor.fetchone():
+                    cursor.execute(f"""
+                        CREATE SUBSCRIPTION {subscription_name}
+                        CONNECTION 'host={db_primary_host} dbname={db_name} user={db_user} password={db_password}'
+                        PUBLICATION pub_produtos;
+                    """)
+                    print(f"Subscription {subscription_name} criada com sucesso na replica {replica_host}")
+                else:
+                    print(f"Subscription {subscription_name} já existe na replica {replica_host}")
             
-            cursor.close()
-            conn.close()
-        except Exception as e:
-            print(f"Erro ao configurar a réplica {replica_host}: {e}")
+                cursor.close()
+                conn.close()
+                conectado = True
+            except Exception as e:
+                tentativas += 1
+                print(f"Erro ao configurar a réplica {replica_host}: {e}")
+                time.sleep(3)  
