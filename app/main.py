@@ -119,35 +119,42 @@ def startup_logical_replication():
     db_primary_host = DB_PRIMARY_HOST
     
     # Configura a publicação no banco de dados primário
-    try:
-        conn_primary = psycopg2.connect(
-            host=db_primary_host,
-            database=db_name,
-            user=db_user,
-            password=db_password
-        )
-        conn_primary.autocommit = True
-        cursor_primary = conn_primary.cursor()
+    conectado_primary = False
+    tentativas_primary = 0
+    max_tentativas = 5
+        
+    while not conectado_primary and tentativas_primary < max_tentativas:
+        try:
+            conn_primary = psycopg2.connect(
+                host=db_primary_host,
+                database=db_name,
+                user=db_user,
+                password=db_password
+            )
+            conn_primary.autocommit = True
+            cursor_primary = conn_primary.cursor()
 
-        # Cria a publicação no banco de dados primário
-        cursor_primary.execute("SELECT 1 FROM pg_publication WHERE pubname = 'pub_produtos'")
-        if not cursor_primary.fetchone():
-            cursor_primary.execute("CREATE PUBLICATION pub_produtos FOR TABLE produto;")
-            print("Publicação 'pub_produtos' criada com sucesso no banco primário.")
-        else:
-            print("Publicação 'pub_produtos' já existe no banco primário.")
+            # Cria a publicação no banco de dados primário
+            cursor_primary.execute("SELECT 1 FROM pg_publication WHERE pubname = 'pub_produtos'")
+            if not cursor_primary.fetchone():
+                cursor_primary.execute("CREATE PUBLICATION pub_produtos FOR TABLE produto;")
+                print("Publicação 'pub_produtos' criada com sucesso no banco primário.")
+            else:
+                print("Publicação 'pub_produtos' já existe no banco primário.")
 
-        cursor_primary.close()
-        conn_primary.close()
-    except Exception as e:
-        print(f"Erro ao configurar a publicação no banco primário: {e}")
+            cursor_primary.close()
+            conn_primary.close()
+            conectado_primary = True
+        except Exception as e:
+            tentativas_primary += 1
+            print(f"Erro ao configurar a publicação no banco primário: {e}")
+            time.sleep(3)
 
     # Configura a assinatura em cada réplica
     for replica_host in DB_REPLICA_HOST:
         subscription_name = f"sub_{replica_host.replace('-', '_')}"
         conectado = False
         tentativas = 0
-        max_tentativas = 5
         
         while not conectado and tentativas < max_tentativas:
             try:
