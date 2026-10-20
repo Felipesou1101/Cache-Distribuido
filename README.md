@@ -1,8 +1,8 @@
-# 🚀 API Distribuída com Caching e Replicação Lógica (FastAPI + Redis + PostgreSQL)
+# API Distribuída com Caching e Replicação Lógica
 
 Uma arquitetura de microsserviços/serviços distribuídos de alta disponibilidade e performance. O projeto simula um ambiente de produção real contendo separação de leitura/escrita (*CQRS pattern* simplificado), cache distribuído para leituras rápidas, balanceamento de carga entre instâncias da aplicação e replicação de dados assíncrona/lógica entre bancos de dados PostgreSQL.
 
-### 🧩 Componentes do Sistema
+## 🧩 Componentes do Sistema
 
 * **Nginx**: Atua como *Reverse Proxy* e *Load Balancer*, distribuindo as requisições recebidas na porta `8090` entre os nós `app1` e `app2` usando estratégias de *Round-Robin*.
 * **FastAPI (`app1` / `app2`)**: Instâncias da aplicação Python que processam as requisições HTTP e gerenciam as regras de negócio.
