@@ -9,13 +9,13 @@ import redis
 
 app = FastAPI()
 
-# Variáveis de ambiente configuradas no Docker Compose
 HOSTNAME = os.getenv("HOSTNAME", "Instância Desconhecida")
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-DB_REPLICA_HOST = os.getenv("DB_REPLICA_HOST", "postgres-leitura-1,postgres-leitura-2").split(",")
+DB_REPLICA_HOST = [
+    host.strip() for host in os.getenv("DB_REPLICA_HOST", "postgres-leitura-1,postgres-leitura-2").split(",")
+]
 DB_PRIMARY_HOST = os.getenv("DB_PRIMARY_HOST","postgres-escrita")
 
-# Conexão com o Redis (Cache Distribuído)
 cache = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
 
 def get_primary_db_connection():
@@ -91,10 +91,8 @@ def buscar_produto(produto_id: int):
     if not produto:
         return {"erro": "Produto não encontrado"}
 
-    # Converte preço NUMERIC para float para serializar JSON
     produto['preco'] = float(produto['preco'])
 
-    # 3. Salva no Redis com TTL de 30 segundos
     cache.setex(chave_cache, 30, json.dumps(produto))
 
     tempo_ms = round((time.time() - inicio) * 1000, 2)
