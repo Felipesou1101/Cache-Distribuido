@@ -103,6 +103,7 @@ def buscar_produto(produto_id: int):
         "dados": produto
     }
 
+
 @app.put("/produtos/{produto_id}")
 def atualizar_preco(produto_id: int, novo_preco: float):
     """
@@ -145,7 +146,7 @@ def criar_produto(nome: str, preco: float, id_categoria: int):
         id_categoria (int): ID da categoria do produto.
 
     Returns:
-        dict: Dicionário contendo a mensagem de sucesso e os dados do produto criado.
+        dict: Dicionário contendo a mensagem de sucesso e o ID do produto criado.
     """
     conn = get_primary_db_connection()
     cursor = conn.cursor()
@@ -154,26 +155,26 @@ def criar_produto(nome: str, preco: float, id_categoria: int):
         VALUES (%s, %s, %s)
         RETURNING id
     """, (nome, preco, id_categoria))
-    produto_id = cursor.fetchone()[0]
+    produto_id = cursor.fetchone()['id']
     conn.commit()
     cursor.close()
     conn.close()
 
     return {
-        "mensagem": f"Produto criado com sucesso.",
+        "mensagem": "Produto criado com sucesso.",
         "id": produto_id
     }
 
 @app.post("/categorias")
 def criar_categoria(nome: str):
     """
-    Cria uma nova categoria no banco de dados primário (Master/Primary).
+    Cria uma nova categoria no banco de dados primário (Master/Primary)
 
     Args:
-        nome (str): Nome da categoria.
+        nome (str): Nome da categoria a ser criada.
 
     Returns:
-        dict: Dicionário contendo a mensagem de sucesso e os dados da categoria criada.
+        dict: Dicionário contendo a mensagem de sucesso e o ID da categoria criada.
     """
     conn = get_primary_db_connection()
     cursor = conn.cursor()
@@ -182,13 +183,13 @@ def criar_categoria(nome: str):
         VALUES (%s)
         RETURNING id
     """, (nome,))
-    categoria_id = cursor.fetchone()[0]
+    categoria_id = cursor.fetchone()['id']
     conn.commit()
     cursor.close()
     conn.close()
 
     return {
-        "mensagem": f"Categoria criada com sucesso.",
+        "mensagem": "Categoria criada com sucesso.",
         "id": categoria_id
     }
 
@@ -199,7 +200,7 @@ def deletar_produto(produto_id: int):
 
     Args:
         produto_id (int): ID do produto a ser deletado.
-
+    
     Returns:
         dict: Dicionário contendo a mensagem de sucesso, chave de cache invalidada e hostname
               do container que processou a requisição.
@@ -211,15 +212,19 @@ def deletar_produto(produto_id: int):
     cursor.close()
     conn.close()
 
-    # Invalidação de Cache Explicita
+    # Invalidação de Cache Explícita
     chave_cache = f"produto:{produto_id}"
-    cache.delete(chave_cache)
+    try:
+        cache.delete(chave_cache)
+    except Exception as e:
+        print(f"Erro ao apagar chave do Redis: {e}")
 
     return {
         "mensagem": f"Produto {produto_id} deletado do BD Primary.",
         "cache_invalidado": chave_cache,
         "processado_por": HOSTNAME
     }
+
 
 @app.on_event("startup")
 def startup_logical_replication():
