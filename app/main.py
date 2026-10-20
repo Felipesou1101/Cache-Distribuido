@@ -176,7 +176,7 @@ def startup_logical_replication():
                         CREATE SUBSCRIPTION {subscription_name}
                         CONNECTION 'host={db_primary_host} dbname={db_name} user={db_user} password={db_password}'
                         PUBLICATION pub_produtos
-                        WITH (copy_date = false);
+                        WITH (copy_data = false);
                     """)
                     print(f"Subscription {subscription_name} criada com sucesso na replica {replica_host}")
                 else:
