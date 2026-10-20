@@ -19,6 +19,7 @@ DB_PRIMARY_HOST = os.getenv("DB_PRIMARY_HOST","postgres-escrita")
 cache = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
 
 def get_primary_db_connection():
+    """Retorna uma conexão com o banco de dados primário (Master/Primary)."""
 	return psycopg2.connect(
 	    host= DB_PRIMARY_HOST,
         database= os.getenv("POSTGRES_DB"),
@@ -32,6 +33,7 @@ def get_random_replica_host():
     return random.choice(DB_REPLICA_HOST)
 
 def get_db_connection():
+    """Retorna uma conexão com um banco de dados de leitura (Réplica) aleatório."""
     return psycopg2.connect(
         host= get_random_replica_host(),
         database= os.getenv("POSTGRES_DB"),
@@ -42,10 +44,22 @@ def get_db_connection():
 
 @app.get("/")
 def home():
+    """Rota de teste para verificar se a API está rodando."""
     return {"mensagem": "API Rodando", "atendido_por_container": HOSTNAME}
+
 
 @app.get("/produtos/{produto_id}")
 def buscar_produto(produto_id: int):
+    """
+    Busca informações de um produto pelo ID, utilizando cache distribuído (Redis) e banco de dados de leitura (Réplica).
+    
+    Args:
+        produto_id (int): ID do produto a ser buscado.
+
+    Returns:
+        dict: Dicionário contendo a origem da resposta (cache ou banco de dados), tempo de resposta em milissegundos,
+              hostname do container que atendeu a requisição e os dados do produto.
+    """
     chave_cache = f"produto:{produto_id}"
     inicio = time.time()
 
@@ -91,9 +105,21 @@ def buscar_produto(produto_id: int):
         "dados": produto
     }
 
+
 @app.put("/produtos/{produto_id}")
 def atualizar_preco(produto_id: int, novo_preco: float):
-    # 1. Atualiza no Banco de ESCRITA (Master/Primary)
+    """
+    Atualiza o preço de um produto no banco de dados primário (Master/Primary)
+    e invalida o cache correspondente no Redis.
+    
+    Args:
+        produto_id (int): ID do produto a ser atualizado.
+        novo_preco (float): Novo preço do produto.
+    
+    Returns:
+        dict: Dicionário contendo a mensagem de sucesso, chave de cache invalidada e hostname
+              do container que processou a requisição.
+    """
     conn = get_primary_db_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE produto SET preco = %s WHERE id = %s", (novo_preco, produto_id))
@@ -101,7 +127,7 @@ def atualizar_preco(produto_id: int, novo_preco: float):
     cursor.close()
     conn.close()
 
-    # 2. Invalidação de Cache Explicita
+    # Invalidação de Cache Explicita
     chave_cache = f"produto:{produto_id}"
     cache.delete(chave_cache)
 
@@ -113,16 +139,22 @@ def atualizar_preco(produto_id: int, novo_preco: float):
 
 @app.on_event("startup")
 def startup_logical_replication():
+    """
+    Configura a replicação lógica entre o banco de dados primário e as réplicas.
+    
+    Raises:
+        Exception: Se ocorrer algum erro durante a configuração da replicação lógica.
+    """
     db_name = os.getenv("POSTGRES_DB")
     db_user = os.getenv("POSTGRES_USER")
     db_password = os.getenv("POSTGRES_PASSWORD")
     db_primary_host = DB_PRIMARY_HOST
     
-    # Configura a publicação no banco de dados primário
     conectado_primary = False
     tentativas_primary = 0
     max_tentativas = 5
         
+    # Cria a publicação no banco de dados primário
     while not conectado_primary and tentativas_primary < max_tentativas:
         try:
             conn_primary = psycopg2.connect(
@@ -134,7 +166,6 @@ def startup_logical_replication():
             conn_primary.autocommit = True
             cursor_primary = conn_primary.cursor()
 
-            # Cria a publicação no banco de dados primário
             cursor_primary.execute("SELECT 1 FROM pg_publication WHERE pubname = 'pub_produtos'")
             if not cursor_primary.fetchone():
                 cursor_primary.execute("CREATE PUBLICATION pub_produtos FOR ALL TABLES;")
